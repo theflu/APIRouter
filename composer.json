@@ -1,0 +1,13 @@
+{
+    "name": "theflu/apirouter",
+    "description": "A simple PHP API Router with Auth, Logging, and Permissions support.",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "APIRouter\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=7.4"
+    }
+}
