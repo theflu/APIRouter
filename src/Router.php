@@ -12,10 +12,20 @@ class Router
 {
     private bool $debug_enabled = false;
     private array $routes = [];
+    private array $global_pre_auth_middlewares = [];
+    private array $global_pre_route_middlewares = [];
+    private array $global_post_route_middlewares = [];
     private array $prefix_stack = [];
+
+    /** @var mixed */
+    private $user = null;
     private ?LoggerInterface $logger = null;
     private ?AuthenticatorInterface $authenticator = null;
     private ?PermissionsInterface $authorizer = null;
+
+    public const PRE_AUTH = 0;
+    public const PRE_ROUTE = 1;
+    public const POST_ROUTE = 2;
 
     public function __construct(
         ?LoggerInterface $logger = null,
@@ -69,6 +79,24 @@ class Router
         array_pop($this->prefix_stack);
     }
 
+    public function use(callable $middleware, int $position = self::PRE_ROUTE): void
+    {
+        switch ($position) {
+            case self::PRE_AUTH:
+                $this->global_pre_auth_middlewares[] = $middleware;
+                break;
+            case self::PRE_ROUTE:
+                $this->global_pre_route_middlewares[] = $middleware;
+                break;
+            case self::POST_ROUTE:
+                $this->global_post_route_middlewares[] = $middleware;
+                break;
+            default:
+                throw new \InvalidArgumentException('Invalid postion value');
+
+        }
+    }
+
     public function debug(bool $enable): void
     {
         $this->debug_enabled = $enable;
@@ -79,43 +107,27 @@ class Router
         $request = $request ?? new Request();
         $start_time = microtime(true);
         $response = new Response();
-        $user = null;
+        $this->user = null;
 
         try {
-            // Authentication
-            if ($this->authenticator) {
-                $user = $this->authenticator->authenticate($request);
-                if ($user) {
-                    $request->setAttribute('user', $user);
-                }
+            // Build stack
+            $route_stack = function ($req, $res) {
+                $this->authenticate($req);
+                $this->route($req, $res);
+            };
+
+            // Add pre auth middleware
+            foreach (array_reverse($this->global_pre_auth_middlewares) as $middleware) {
+                $next = $route_stack;
+
+                $route_stack = function ($req, $res) use ($middleware, $next) {
+                    call_user_func($middleware, $req, $res, $next);
+                };
             }
 
-            // Find matching route
-            $route = $this->match($request);
+            // Run route stack
+            $route_stack($request, $response);
 
-            if (!$route) {
-                $response->setStatusCode(404)->setJson(['error' => 'Not Found']);
-            } elseif ($route->isAuthRequired() && !$this->authenticator) {
-                throw new \LogicException(
-                    "Route '{$route->getPath()}' requires authentication but no AuthenticatorInterface was provided."
-                );
-            } elseif ($route->getRequiredPermission() && !$this->authorizer) {
-                throw new \LogicException(
-                    "Route '{$route->getPath()}' requires permission '{$route->getRequiredPermission()}' but no PermissionsInterface was provided."
-                );
-            } elseif ($route->isAuthRequired() && !$user) {
-                // Route requires authentication but no authenticated user
-                $response->setStatusCode(401)->setJson(['error' => 'Unauthorized']);
-            } elseif (
-                $route->getRequiredPermission()
-                && !$this->authorizer->hasPermission($user, $route->getRequiredPermission())
-            ) {
-                // User lacks the required permission
-                $response->setStatusCode(403)->setJson(['error' => 'Forbidden']);
-            } else {
-                // Execute route
-                $this->executeRoute($route, $request, $response, $user);
-            }
 
         } catch (\LogicException $e) {
             // Developer configuration errors should still surface clearly
@@ -139,7 +151,46 @@ class Router
         // Logging
         if ($this->logger) {
             $latency = microtime(true) - $start_time;
-            $this->logger->logRequest($request, $response, $latency, $user);
+            $this->logger->logRequest($request, $response, $latency, $this->user);
+        }
+    }
+
+    private function authenticate(Request $request): void
+    {
+        if ($this->authenticator) {
+            $this->user = $this->authenticator->authenticate($request);
+            if ($this->user) {
+                $request->setAttribute('user', $this->user);
+            }
+        }
+    }
+
+    private function route(Request $request, Response $response): void
+    {
+        $route = $this->match($request);
+
+        if (!$route) {
+            $response->setStatusCode(404)->setJson(['error' => 'Not Found']);
+        } elseif ($route->isAuthRequired() && !$this->authenticator) {
+            throw new \LogicException(
+                "Route '{$route->getPath()}' requires authentication but no AuthenticatorInterface was provided."
+            );
+        } elseif ($route->getRequiredPermission() && !$this->authorizer) {
+            throw new \LogicException(
+                "Route '{$route->getPath()}' requires permission '{$route->getRequiredPermission()}' but no PermissionsInterface was provided."
+            );
+        } elseif ($route->isAuthRequired() && !$this->user) {
+            // Route requires authentication but no authenticated user
+            $response->setStatusCode(401)->setJson(['error' => 'Unauthorized']);
+        } elseif (
+            $route->getRequiredPermission()
+            && !$this->authorizer->hasPermission($this->user, $route->getRequiredPermission())
+        ) {
+            // User lacks the required permission
+            $response->setStatusCode(403)->setJson(['error' => 'Forbidden']);
+        } else {
+            // Execute middlewares and handler
+            $this->executeRoute($route, $request, $response, $this->user);
         }
     }
 
@@ -170,9 +221,39 @@ class Router
 
     private function executeRoute(Route $route, Request $request, Response $response, $user)
     {
-        // Get the routes handler
+        // Stack  pre route middlewares: Global -> Route Specific -> Handler
+        $pre_middlewares = array_merge($this->global_pre_route_middlewares, $route->getPreMiddlewares());
+
+        // Stack  post route middlewares: Handler -> Global -> Route Specific
+        $post_middlewares = array_merge($this->global_post_route_middlewares, $route->getPostMiddlewares());
+
+        // Get the handler from the route
         $handler = $route->getHandler();
 
-        return call_user_func($handler, $request, $response, $route->getParams());
+        // Build the post middleware stack
+        $post_dispatch = function ($req, $res) {};
+        foreach (array_reverse($post_middlewares, true) as $key => $middleware) {
+            $next = $post_dispatch;
+
+            $post_dispatch = function ($req, $res) use ($middleware, $next) {
+                return call_user_func($middleware, $req, $res, $next);
+            };
+        }
+
+        // Add the route handler to the stack
+        $dispatch = function ($req, $res) use ($handler, $route, $post_dispatch) {
+            return call_user_func($handler, $req, $res, $route->getParams(), $post_dispatch);
+        };
+
+        // Add the pre middle ware tot eh stack
+        foreach (array_reverse($pre_middlewares) as $middleware) {
+            $next = $dispatch;
+            $dispatch = function ($req, $res) use ($middleware, $next) {
+                return call_user_func($middleware, $req, $res, $next);
+            };
+        }
+
+        // Run the stack
+        return $dispatch($request, $response);
     }
 }

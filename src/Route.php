@@ -8,10 +8,12 @@ class Route
     private string $path;
     private $handler;
     private array $params = [];
+    private array $pre_middlewares = [];
+    private array $post_middlewares = [];
     private ?string $required_permission = null;
     private bool $requires_auth = false;
 
-    public function __construct(string $method, string $path, $handler)
+    public function __construct(string $method, string $path, callable $handler)
     {
         $this->method = $method;
         $this->path = $path;
@@ -28,9 +30,12 @@ class Route
         return $this->path;
     }
 
-    public function getHandler()
+    public function getHandler(): callable
     {
-        return $this->handler;
+        return function ($req, $res, $params, $next) {
+            call_user_func($this->handler, $req, $res, $params);
+            return $next($req, $res, $next);
+        };
     }
 
     public function setParams(array $params): void
@@ -41,6 +46,28 @@ class Route
     public function getParams(): array
     {
         return $this->params;
+    }
+
+    public function addPreMiddleware(callable $middleware): self
+    {
+        $this->pre_middlewares[] = $middleware;
+        return $this;
+    }
+
+    public function getPreMiddlewares(): array
+    {
+        return $this->pre_middlewares;
+    }
+
+    public function addPostMiddleware(callable $middleware): self
+    {
+        $this->post_middlewares[] = $middleware;
+        return $this;
+    }
+
+    public function getPostMiddlewares(): array
+    {
+        return $this->post_middlewares;
     }
 
     public function requireAuth(): self
