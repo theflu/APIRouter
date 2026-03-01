@@ -127,7 +127,7 @@ class Router
                 $error['debug'] = [
                     'code' => $e->getCode(),
                     'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
+                    'trace' => $e->getTrace(),
                 ];
             }
 
