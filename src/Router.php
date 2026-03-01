@@ -10,6 +10,7 @@ use APIRouter\Interfaces\PermissionsInterface;
 
 class Router
 {
+    private bool $debug_enabled = false;
     private array $routes = [];
     private array $prefix_stack = [];
     private ?LoggerInterface $logger = null;
@@ -68,6 +69,11 @@ class Router
         array_pop($this->prefix_stack);
     }
 
+    public function debug(bool $enable): void
+    {
+        $this->debug_enabled = $enable;
+    }
+
     public function dispatch(?Request $request = null): void
     {
         $request = $request ?? new Request();
@@ -115,7 +121,17 @@ class Router
             // Developer configuration errors should still surface clearly
             throw $e;
         } catch (\Throwable $e) {
-            $response->setStatusCode(500)->setJson(['error' => 'Internal Server Error']);
+            $error = ['error' => 'Internal Server Error'];
+
+            if ($this->debug_enabled) {
+                $error['debug'] = [
+                    'code' => $e->getCode(),
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ];
+            }
+
+            $response->setStatusCode(500)->setJson($error);
         }
 
         $response->send();
