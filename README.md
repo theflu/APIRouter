@@ -1,6 +1,6 @@
 # APIRouter
 
-A lightweight PHP API router with built-in support for authentication, authorization, logging, route groups, and rate limiting.
+A lightweight PHP API router with built-in support for authentication, authorization, logging, route groups, and middleware.
 
 ## Features
 
@@ -9,6 +9,7 @@ A lightweight PHP API router with built-in support for authentication, authoriza
 - **Route groups** - Nest routes under a shared prefix
 - **Authentication & Authorization** - Plug in your own via interfaces
 - **Logging** - Per-request latency and user context
+- **Middleware** - Three-phase pipeline with global and route-level support
 
 ## Installation
 
@@ -116,4 +117,58 @@ class MyLogger implements LoggerInterface {
 }
 
 $router = new Router(new MyLogger());
+```
+
+## Middleware
+
+Middleware runs at one of three positions in the request lifecycle:
+
+```
+PRE_AUTH → authenticate() → PRE_ROUTE → Handler → POST_ROUTE
+```
+
+### Global Middleware
+
+Register with `$router->use()`. Defaults to `PRE_ROUTE`.
+
+```php
+// Runs before authentication (e.g. CORS headers, IP filtering)
+$router->use($my_middleware, Router::PRE_AUTH);
+
+// Runs after authentication, before the handler (default)
+$router->use($my_middleware, Router::PRE_ROUTE);
+
+// Runs after the handler (e.g. response logging, cleanup)
+$router->use($my_middleware, Router::POST_ROUTE);
+```
+
+Calling `$next` advances the chain. Not calling it short-circuits the rest of that phase.
+
+### Route-Level Middleware
+
+```php
+$router->get('/admin', $handler)
+    ->addPreMiddleware($my_pre_middleware)
+    ->addPostMiddleware($my_post_middleware);
+```
+
+Route-level middleware runs after global middleware of the same position.
+
+### Implementing Middleware
+
+Implement `MiddlewareInterface`:
+
+```php
+use APIRouter\Interfaces\MiddlewareInterface;
+use APIRouter\Http\Request;
+use APIRouter\Http\Response;
+
+class MyMiddleware implements MiddlewareInterface
+{
+    public function __invoke(Request $request, Response $response, callable $next): void
+    {
+        // Logic before handler
+        $next($request, $response);
+    }
+}
 ```
