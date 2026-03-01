@@ -173,11 +173,6 @@ class Router
         // Get the routes handler
         $handler = $route->getHandler();
 
-        // Ensure handler is executable
-        if (!is_callable($handler)) {
-            throw new \RuntimeException("Route handler is not callable.");
-        }
-
         return call_user_func($handler, $request, $response, $route->getParams());
     }
 }
