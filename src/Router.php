@@ -102,6 +102,21 @@ class Router
         $this->debug_enabled = $enable;
     }
 
+    public function loadRoutes(string $routes_path):void
+    {
+        if (is_dir($routes_path)) {
+            $di = new \RecursiveDirectoryIterator($routes_path);
+            foreach (new \RecursiveIteratorIterator($di) as $filename => $file) {
+                if ($file->isFile())
+                    require $filename;
+            }
+        } elseif (is_file($routes_path)) {
+            require $routes_path;
+        } else {
+            throw new \Exception('PAth does not exist');
+        }
+    }
+
     public function dispatch(?Request $request = null): void
     {
         $request = $request ?? new Request();
