@@ -1,6 +1,6 @@
 {
     "name": "theflu/apirouter",
-    "description": "A simple PHP API Router with Auth, Logging, and Permissions support.",
+    "description": "A simple PHP API Router that is PSR-7 and PSR-15 compliant.",
     "type": "library",
     "autoload": {
         "psr-4": {
