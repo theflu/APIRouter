@@ -2,40 +2,15 @@
 
 namespace APIRouter;
 
-use APIRouter\Http\Request;
-use APIRouter\Http\Response;
-use APIRouter\Interfaces\LoggerInterface;
-use APIRouter\Interfaces\AuthenticatorInterface;
-use APIRouter\Interfaces\PermissionsInterface;
+
+use APIRouter\Interfaces\MiddlewareInterface;
 
 class Router
 {
     private bool $debug_enabled = false;
     private array $routes = [];
-    private array $global_pre_auth_middlewares = [];
-    private array $global_pre_route_middlewares = [];
-    private array $global_post_route_middlewares = [];
+    private array $middlewares = [];
     private array $prefix_stack = [];
-
-    /** @var mixed */
-    private $user = null;
-    private ?LoggerInterface $logger = null;
-    private ?AuthenticatorInterface $authenticator = null;
-    private ?PermissionsInterface $authorizer = null;
-
-    public const PRE_AUTH = 0;
-    public const PRE_ROUTE = 1;
-    public const POST_ROUTE = 2;
-
-    public function __construct(
-        ?LoggerInterface $logger = null,
-        ?AuthenticatorInterface $authenticator = null,
-        ?PermissionsInterface $authorizer = null
-    ) {
-        $this->logger = $logger;
-        $this->authenticator = $authenticator;
-        $this->authorizer = $authorizer;
-    }
 
     public function get(string $path, $handler): Route
     {
@@ -79,22 +54,9 @@ class Router
         array_pop($this->prefix_stack);
     }
 
-    public function use(callable $middleware, int $position = self::PRE_ROUTE): void
+    public function use(MiddlewareInterface $middleware): void
     {
-        switch ($position) {
-            case self::PRE_AUTH:
-                $this->global_pre_auth_middlewares[] = $middleware;
-                break;
-            case self::PRE_ROUTE:
-                $this->global_pre_route_middlewares[] = $middleware;
-                break;
-            case self::POST_ROUTE:
-                $this->global_post_route_middlewares[] = $middleware;
-                break;
-            default:
-                throw new \InvalidArgumentException('Invalid postion value');
-
-        }
+        $this->middlewares[] = $middleware;
     }
 
     public function debug(bool $enable): void
@@ -102,7 +64,7 @@ class Router
         $this->debug_enabled = $enable;
     }
 
-    public function loadRoutes(string $routes_path):void
+    public function loadRoutes(string $routes_path): void
     {
         if (is_dir($routes_path)) {
             $di = new \RecursiveDirectoryIterator($routes_path);
@@ -117,35 +79,53 @@ class Router
         }
     }
 
-    public function dispatch(?Request $request = null): void
+    public function dispatch(?ServerRequest $request = null): void
     {
-        $request = $request ?? new Request();
         $start_time = microtime(true);
-        $response = new Response();
-        $this->user = null;
+
+        // Create the request if we didn't get one
+        if (is_null($request)) {
+            $request = new ServerRequest();
+        }
+
+        // Add the start_time attribute
+        $request = $request->withAttribute('start_time', $start_time);
+
+        // Find the matching route
+        $route = $this->match($request);
+
+        if ($route === null) {
+            $this->emit(new Response(404));
+            return;
+        }
 
         try {
-            // Build stack
-            $route_stack = function ($req, $res) {
-                $this->authenticate($req);
-                $this->route($req, $res);
+            $middlewares = array_merge($this->middlewares, $route->getMiddlewares());
+
+            $runner = new class ($middlewares, $route) implements \Psr\Http\Server\RequestHandlerInterface {
+                private array $middlewares;
+                private $route;
+                private int $index = 0;
+
+                public function __construct(array $middlewares, Route $route)
+                {
+                    $this->middlewares = $middlewares;
+                    $this->route = $route;
+                }
+
+                public function handle(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface
+                {
+                    if (isset($this->middlewares[$this->index])) {
+                        $middleware = $this->middlewares[$this->index];
+                        $this->index++;
+                        return $middleware->process($request, $this);
+                    }
+                    return $this->route->handle($request);
+                }
             };
 
-            // Add pre auth middleware
-            foreach (array_reverse($this->global_pre_auth_middlewares) as $middleware) {
-                $next = $route_stack;
-
-                $route_stack = function ($req, $res) use ($middleware, $next) {
-                    call_user_func($middleware, $req, $res, $next);
-                };
-            }
-
-            // Run route stack
-            $route_stack($request, $response);
-
-
+            $response = $runner->handle($request);
         } catch (\LogicException $e) {
-            // Developer configuration errors should still surface clearly
             throw $e;
         } catch (\Throwable $e) {
             $error = ['error' => 'Internal Server Error'];
@@ -158,60 +138,15 @@ class Router
                 ];
             }
 
-            $response->setStatusCode(500)->setJson($error);
+            $response = (new Response(500, ['Content-Type: application/json']))->withJsonBody($error);
         }
 
-        $response->send();
-
-        // Logging
-        if ($this->logger) {
-            $latency = microtime(true) - $start_time;
-            $this->logger->logRequest($request, $response, $latency, $this->user);
-        }
+        $this->emit($response);
     }
 
-    private function authenticate(Request $request): void
+    private function match(ServerRequest $request): ?Route
     {
-        if ($this->authenticator) {
-            $this->user = $this->authenticator->authenticate($request);
-            if ($this->user) {
-                $request->setAttribute('user', $this->user);
-            }
-        }
-    }
-
-    private function route(Request $request, Response $response): void
-    {
-        $route = $this->match($request);
-
-        if (!$route) {
-            $response->setStatusCode(404)->setJson(['error' => 'Not Found']);
-        } elseif ($route->isAuthRequired() && !$this->authenticator) {
-            throw new \LogicException(
-                "Route '{$route->getPath()}' requires authentication but no AuthenticatorInterface was provided."
-            );
-        } elseif ($route->getRequiredPermission() && !$this->authorizer) {
-            throw new \LogicException(
-                "Route '{$route->getPath()}' requires permission '{$route->getRequiredPermission()}' but no PermissionsInterface was provided."
-            );
-        } elseif ($route->isAuthRequired() && !$this->user) {
-            // Route requires authentication but no authenticated user
-            $response->setStatusCode(401)->setJson(['error' => 'Unauthorized']);
-        } elseif (
-            $route->getRequiredPermission()
-            && !$this->authorizer->hasPermission($this->user, $route->getRequiredPermission())
-        ) {
-            // User lacks the required permission
-            $response->setStatusCode(403)->setJson(['error' => 'Forbidden']);
-        } else {
-            // Execute middlewares and handler
-            $this->executeRoute($route, $request, $response, $this->user);
-        }
-    }
-
-    private function match(Request $request): ?Route
-    {
-        $uri = $request->getUri();
+        $uri = $request->getUri()->getPath();
         $method = $request->getMethod();
 
         foreach ($this->routes as $route) {
@@ -234,41 +169,27 @@ class Router
         return null;
     }
 
-    private function executeRoute(Route $route, Request $request, Response $response, $user)
+    private function emit(Response $response)
     {
-        // Stack  pre route middlewares: Global -> Route Specific -> Handler
-        $pre_middlewares = array_merge($this->global_pre_route_middlewares, $route->getPreMiddlewares());
+        $status_code = $response->getStatusCode();
 
-        // Stack  post route middlewares: Handler -> Global -> Route Specific
-        $post_middlewares = array_merge($this->global_post_route_middlewares, $route->getPostMiddlewares());
-
-        // Get the handler from the route
-        $handler = $route->getHandler();
-
-        // Build the post middleware stack
-        $post_dispatch = function ($req, $res) {};
-        foreach (array_reverse($post_middlewares, true) as $key => $middleware) {
-            $next = $post_dispatch;
-
-            $post_dispatch = function ($req, $res) use ($middleware, $next) {
-                return call_user_func($middleware, $req, $res, $next);
-            };
+        foreach ($response->getHeaders() as $header => $values) {
+            assert(is_string($header));
+            $name = ucwords($header, '-');
+            $replace = $name !== 'Set-Cookie';
+            foreach ($values as $value) {
+                header($name . ': ' . $value, $replace, $status_code);
+                $replace = false;
+            }
         }
 
-        // Add the route handler to the stack
-        $dispatch = function ($req, $res) use ($handler, $route, $post_dispatch) {
-            return call_user_func($handler, $req, $res, $route->getParams(), $post_dispatch);
-        };
+        header(sprintf(
+            'HTTP/%s %d%s',
+            $response->getProtocolVersion(),
+            $status_code,
+            $response->getReasonPhrase() ? ' ' . $response->getReasonPhrase() : ''
+        ), true, $status_code);
 
-        // Add the pre middle ware tot eh stack
-        foreach (array_reverse($pre_middlewares) as $middleware) {
-            $next = $dispatch;
-            $dispatch = function ($req, $res) use ($middleware, $next) {
-                return call_user_func($middleware, $req, $res, $next);
-            };
-        }
-
-        // Run the stack
-        return $dispatch($request, $response);
+        echo $response->getBody();
     }
 }

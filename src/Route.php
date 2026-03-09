@@ -2,14 +2,17 @@
 
 namespace APIRouter;
 
+use APIRouter\Interfaces\MiddlewareInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+
 class Route
 {
     private string $method;
     private string $path;
     private $handler;
     private array $params = [];
-    private array $pre_middlewares = [];
-    private array $post_middlewares = [];
+    private array $middlewares = [];
     private ?string $required_permission = null;
     private bool $requires_auth = false;
 
@@ -18,6 +21,11 @@ class Route
         $this->method = $method;
         $this->path = $path;
         $this->handler = $handler;
+    }
+
+    public function handle(ServerRequestInterface $request): ResponseInterface
+    {
+        return call_user_func($this->handler, $request);
     }
 
     public function getMethod(): string
@@ -48,26 +56,15 @@ class Route
         return $this->params;
     }
 
-    public function addPreMiddleware(callable $middleware): self
+    public function addMiddleware(MiddlewareInterface $middleware): self
     {
-        $this->pre_middlewares[] = $middleware;
+        $this->middlewares[] = $middleware;
         return $this;
     }
 
-    public function getPreMiddlewares(): array
+    public function getMiddlewares(): array
     {
-        return $this->pre_middlewares;
-    }
-
-    public function addPostMiddleware(callable $middleware): self
-    {
-        $this->post_middlewares[] = $middleware;
-        return $this;
-    }
-
-    public function getPostMiddlewares(): array
-    {
-        return $this->post_middlewares;
+        return $this->middlewares;
     }
 
     public function requireAuth(): self
