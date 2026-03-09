@@ -130,8 +130,6 @@ class Router
             };
 
             $response = $runner->handle($request);
-        } catch (\LogicException $e) {
-            throw $e;
         } catch (\Throwable $e) {
             $error = ['error' => 'Internal Server Error'];
 
@@ -143,7 +141,7 @@ class Router
                 ];
             }
 
-            $response = (new Response(500, ['Content-Type: application/json']))->withJsonBody($error);
+            $response = (new Response(500))->withJsonBody($error);
         }
 
         $this->emit($response);
