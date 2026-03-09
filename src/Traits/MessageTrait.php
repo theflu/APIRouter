@@ -119,4 +119,32 @@ trait MessageTrait
 
         return $message;
     }
+
+    /**
+     * Encodes $content in JSON and applies it to boday adding the json content type
+     *
+     * @param array|object $content
+     * @return static
+     */
+    
+    public function withJsonBody($content): MessageInterface
+    {
+        if (!is_array($content) && !is_object($content)) {
+            throw new InvalidArgumentException(sprintf('Expected array or object, but got %s', gettype($content)));
+        }
+
+        $josn  = json_encode($content);
+
+        // TODO check for errors after json encode
+
+        $message = clone ($this);
+
+        // JSON content type if not already aaplied
+        if (!in_array('application/json', $this->getHeader('Content-Type'))) {
+            $message = $this->withAddedHeader('Content-Type', 'application/json');
+        }
+        $message->stream = Stream::create($josn);
+
+        return $message;
+    }
 }
