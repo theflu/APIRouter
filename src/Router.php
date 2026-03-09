@@ -131,6 +131,11 @@ class Router
 
             $response = $runner->handle($request);
         } catch (\Throwable $e) {
+            // Still log the error
+            error_log("Error: " . $e->getMessage() . "\n" .
+                "File: " . $e->getFile() . ":" . $e->getLine() . "\n" .
+                "Stack trace: " . $e->getTraceAsString());
+
             $error = ['error' => 'Internal Server Error'];
 
             if ($this->debug_enabled) {
