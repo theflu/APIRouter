@@ -3,6 +3,7 @@
 namespace APIRouter;
 
 use APIRouter\Interfaces\MiddlewareInterface;
+use APIRouter\Interfaces\RequestHandlerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -10,13 +11,13 @@ class Route
 {
     private string $method;
     private string $path;
-    private $handler;
+    private mixed $handler;
     private array $params = [];
     private array $middlewares = [];
     private ?string $required_permission = null;
     private bool $requires_auth = false;
 
-    public function __construct(string $method, string $path, callable $handler)
+    public function __construct(string $method, string $path, RequestHandlerInterface|callable $handler)
     {
         $this->method = $method;
         $this->path = $path;
@@ -25,6 +26,10 @@ class Route
 
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
+        if ($this->handler instanceof RequestHandlerInterface) {
+            return $this->handler->handle($request);
+        }
+
         return call_user_func($this->handler, $request);
     }
 

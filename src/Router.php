@@ -4,6 +4,7 @@ namespace APIRouter;
 
 
 use APIRouter\Interfaces\MiddlewareInterface;
+use APIRouter\Interfaces\RequestHandlerInterface;
 
 class Router
 {
@@ -12,27 +13,27 @@ class Router
     private array $middlewares = [];
     private array $prefix_stack = [];
 
-    public function get(string $path, $handler): Route
+    public function get(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('GET', $path, $handler);
     }
 
-    public function post(string $path, $handler): Route
+    public function post(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('POST', $path, $handler);
     }
 
-    public function put(string $path, $handler): Route
+    public function put(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('PUT', $path, $handler);
     }
 
-    public function delete(string $path, $handler): Route
+    public function delete(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('DELETE', $path, $handler);
     }
 
-    private function addRoute(string $method, string $path, $handler): Route
+    private function addRoute(string $method, string $path, RequestHandlerInterface|callable $handler): Route
     {
         $prefix = implode('', $this->prefix_stack);
         $route = new Route($method, $prefix . $path, $handler);
