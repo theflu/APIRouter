@@ -101,6 +101,10 @@ class Router
         }
 
         try {
+            // Set route attributes on request
+            $request = $request->withAttribute('requires_auth', $route->isAuthRequired())
+                ->withAttribute('required-permission', $route->getRequiredPermission());
+
             $middlewares = array_merge($this->middlewares, $route->getMiddlewares());
 
             $runner = new class ($middlewares, $route) implements \Psr\Http\Server\RequestHandlerInterface {
