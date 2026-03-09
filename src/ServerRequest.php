@@ -3,6 +3,7 @@
 namespace APIRouter;
 
 use APIRouter\Traits\MessageTrait;
+use Nyholm\Psr7\Stream;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UriInterface;
 
@@ -44,6 +45,10 @@ class ServerRequest implements ServerRequestInterface
         $this->method = $method;
 
         parse_str($uri->getQuery(), $this->query_params);
+
+        if ('' !== $body && null !== $body) {
+            $this->stream = Stream::create($body);
+        }
     }
 
     public function getServerParams(): array

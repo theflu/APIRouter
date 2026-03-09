@@ -3,6 +3,7 @@
 namespace APIRouter\Traits;
 
 use InvalidArgumentException;
+use Nyholm\Psr7\Stream;
 use Psr\Http\Message\MessageInterface;
 use Psr\Http\Message\StreamInterface;
 
@@ -105,6 +106,9 @@ trait MessageTrait
 
     public function getBody(): StreamInterface
     {
+        if (null === $this->stream) {
+            $this->stream = Stream::create('');
+        }
         return $this->stream;
     }
 
