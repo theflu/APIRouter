@@ -76,13 +76,13 @@ class Router
         if (is_dir($routes_path)) {
             $di = new \RecursiveDirectoryIterator($routes_path);
             foreach (new \RecursiveIteratorIterator($di) as $filename => $file) {
-                if ($file->isFile())
+                if ($file->isFile() && $file->getExtension() === 'php')
                     require $filename;
             }
         } elseif (is_file($routes_path)) {
             require $routes_path;
         } else {
-            throw new \Exception('PAth does not exist');
+            throw new \Exception('Path does not exist');
         }
     }
 
