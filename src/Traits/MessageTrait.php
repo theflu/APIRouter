@@ -146,7 +146,7 @@ trait MessageTrait
 
         // JSON content type if not already aaplied
         if (!in_array('application/json', $this->getHeader('Content-Type'))) {
-            $message = $this->withAddedHeader('Content-Type', 'application/json');
+            $message = $message->withAddedHeader('Content-Type', 'application/json');
         }
         $message->stream = Stream::create($json);
 
