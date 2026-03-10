@@ -11,7 +11,7 @@ trait MessageTrait
 {
     private array $headers = [];
     private string $version;
-    private $stream  = null;
+    private $stream = null;
 
     public function getProtocolVersion(): string
     {
@@ -131,14 +131,14 @@ trait MessageTrait
      * @param array|object $content
      * @return static
      */
-    
+
     public function withJsonBody($content): MessageInterface
     {
         if (!is_array($content) && !is_object($content)) {
             throw new InvalidArgumentException(sprintf('Expected array or object, but got %s', gettype($content)));
         }
 
-        $josn  = json_encode($content);
+        $json = json_encode($content);
 
         // TODO check for errors after json encode
 
@@ -148,7 +148,7 @@ trait MessageTrait
         if (!in_array('application/json', $this->getHeader('Content-Type'))) {
             $message = $this->withAddedHeader('Content-Type', 'application/json');
         }
-        $message->stream = Stream::create($josn);
+        $message->stream = Stream::create($json);
 
         return $message;
     }
