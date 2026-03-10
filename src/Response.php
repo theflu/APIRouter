@@ -88,7 +88,7 @@ class Response implements ResponseInterface
         foreach($headers as $header) {
             $parts = explode(':', $header);
             $name = strtolower($parts[0]);
-            array_push($parts);
+            array_shift($parts);
             $values = array_map('trim', explode(',', implode(':', $parts)));
             
             // Set the header
