@@ -39,7 +39,12 @@ trait MessageTrait
 
     public function getHeader(string $name): array
     {
-        return $this->headers;
+        if (!$this->hasHeader($name)) {
+            return [];
+        }
+
+        $key = strtolower($name);
+        return $this->headers[$key];
     }
 
     public function getHeaderLine(string $name): string
