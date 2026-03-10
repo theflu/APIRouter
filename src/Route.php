@@ -43,14 +43,6 @@ class Route
         return $this->path;
     }
 
-    public function getHandler(): callable
-    {
-        return function ($req, $res, $params, $next) {
-            call_user_func($this->handler, $req, $res, $params);
-            return $next($req, $res, $next);
-        };
-    }
-
     public function setParams(array $params): void
     {
         $this->params = $params;
