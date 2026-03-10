@@ -80,7 +80,7 @@ class Response implements ResponseInterface
         // Use built in reason if no was provided
         if (is_null($reason) && key_exists($status, self::STATUS_REASONS)) {
             $reason = self::STATUS_REASONS[$status];
-        } else {
+        } elseif (is_null($reason)) {
             $reason = '';
         }
 
@@ -113,7 +113,7 @@ class Response implements ResponseInterface
         // Use built in reason if no was provided
         if (is_null($reason) && key_exists($status, self::STATUS_REASONS)) {
             $reason = self::STATUS_REASONS[$status];
-        } else {
+        } elseif (is_null($reason)) {
             $reason = '';
         }
 
