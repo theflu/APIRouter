@@ -81,11 +81,10 @@ trait MessageTrait
     public function withAddedHeader(string $name, $value): MessageInterface
     {
         $key = strtolower($name);
-        $message = clone ($this);
 
         // If the header doesn't already exist just create it
-        if (!$message->hasHeader($name)) {
-            return $message->withHeader($name, $value);
+        if (!$this->hasHeader($name)) {
+            return $this->withHeader($name, $value);
         }
 
         // Convert string to array
@@ -94,7 +93,7 @@ trait MessageTrait
         }
 
         // Merge old with new and set/return it
-        return $message->withHeader($name, array_merge($message->headers[$key], $value));
+        return $this->withHeader($name, array_merge($this->headers[$key], $value));
     }
 
     public function withoutHeader(string $name): MessageInterface
