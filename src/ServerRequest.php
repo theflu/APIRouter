@@ -14,7 +14,7 @@ class ServerRequest implements ServerRequestInterface
     private array $attributes = [];
     private string $method;
     private string $protocol;
-    private string $request_target;
+    private string $request_target = '/';
     private UriInterface $uri;
     private array $server_params = [];
     private array $cookie_params = [];
