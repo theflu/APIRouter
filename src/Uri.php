@@ -26,7 +26,7 @@ class Uri implements UriInterface
         
         $this->scheme = key_exists('scheme', $parts) ? strtolower($parts['scheme']) : '';
         $this->user_info = key_exists('user', $parts) ? $parts['user'] : '';
-        $this->user_info .= key_exists('password', $parts) ? ':' . $parts['user'] : '';
+        $this->user_info .= key_exists('pass', $parts) ? ':' . $parts['pass'] : '';
         $this->host = key_exists('host', $parts) ? $parts['host'] : '';
         $this->path = key_exists('path', $parts) ? $parts['path'] : '';
         $this->fragment = key_exists('fragment', $parts) ? $parts['fragment'] : '';
