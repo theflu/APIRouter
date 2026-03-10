@@ -11,6 +11,7 @@ class Router
     private bool $debug_enabled = false;
     private array $routes = [];
     private array $middlewares = [];
+    private array $error_middlewares = [];
     private array $prefix_stack = [];
 
     public function get(string $path, RequestHandlerInterface|callable $handler): Route
@@ -60,6 +61,11 @@ class Router
         $this->middlewares[] = $middleware;
     }
 
+    public function useError(MiddlewareInterface $middleware): void
+    {
+        $this->error_middlewares[] = $middleware;
+    }
+
     public function debug(bool $enable): void
     {
         $this->debug_enabled = $enable;
@@ -107,46 +113,29 @@ class Router
 
             $middlewares = array_merge($this->middlewares, $route->getMiddlewares());
 
-            $runner = new class ($middlewares, $route) implements \Psr\Http\Server\RequestHandlerInterface {
-                private array $middlewares;
-                private $route;
-                private int $index = 0;
-
-                public function __construct(array $middlewares, Route $route)
-                {
-                    $this->middlewares = $middlewares;
-                    $this->route = $route;
-                }
-
-                public function handle(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface
-                {
-                    if (isset($this->middlewares[$this->index])) {
-                        $middleware = $this->middlewares[$this->index];
-                        $this->index++;
-                        return $middleware->process($request, $this);
-                    }
-                    return $this->route->handle($request);
-                }
-            };
-
-            $response = $runner->handle($request);
+            $response = $this->runner($middlewares, $route)->handle($request);
         } catch (\Throwable $e) {
             // Still log the error
             error_log("Error: " . $e->getMessage() . "\n" .
                 "File: " . $e->getFile() . ":" . $e->getLine() . "\n" .
                 "Stack trace: " . $e->getTraceAsString());
 
-            $error = ['error' => 'Internal Server Error'];
+            $debug_enabled = $this->debug_enabled;
+            $route = new Route('', '', function ($request) use ($e, $debug_enabled) {
+                $error = ['error' => 'Internal Server Error'];
 
-            if ($this->debug_enabled) {
-                $error['debug'] = [
-                    'code' => $e->getCode(),
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTrace(),
-                ];
-            }
+                if ($debug_enabled) {
+                    $error['debug'] = [
+                        'code' => $e->getCode(),
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTrace(),
+                    ];
+                }
+                
+                return (new Response(500))->withJsonBody($error);
+            });
 
-            $response = (new Response(500))->withJsonBody($error);
+            $response = $this->runner($this->error_middlewares, $route)->handle($request);
         }
 
         $this->emit($response);
@@ -175,6 +164,33 @@ class Router
         }
 
         return null;
+    }
+
+    private function runner($middlewares, $route = null)
+    {
+        $runner = new class ($middlewares, $route) implements \Psr\Http\Server\RequestHandlerInterface {
+            private array $middlewares;
+            private $route;
+            private int $index = 0;
+
+            public function __construct(array $middlewares, Route $route)
+            {
+                $this->middlewares = $middlewares;
+                $this->route = $route;
+            }
+
+            public function handle(\Psr\Http\Message\ServerRequestInterface $request): \Psr\Http\Message\ResponseInterface
+            {
+                if (isset($this->middlewares[$this->index])) {
+                    $middleware = $this->middlewares[$this->index];
+                    $this->index++;
+                    return $middleware->process($request, $this);
+                }
+                return $this->route->handle($request);
+            }
+        };
+
+        return $runner;
     }
 
     private function emit(Response $response)
