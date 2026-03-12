@@ -126,6 +126,9 @@ class Router
                 ->withAttribute('required-permission', $route->getRequiredPermission())
                 ->withAttribute('route-params', $route->getParams());
 
+            // Create request context attribute
+            $request = $request->withAttribute('context', new RequestContext());
+
             $middlewares = array_merge($this->middlewares, $route->getMiddlewares());
 
             $response = $this->runner($middlewares, $route)->handle($request);
