@@ -28,7 +28,7 @@ class ServerRequest implements ServerRequestInterface
         $this->cookie_params = $_COOKIE;
         $this->uploaded_files = $_FILES;
         $this->protocol = $version;
-        $this->headers = function_exists('getallheaders') ? getallheaders() : [];
+        $this->setHeaders();
 
         if(is_null($uri)) {
             $uri = $this->buildUrl();
@@ -195,6 +195,24 @@ class ServerRequest implements ServerRequestInterface
         $request->uri = $uri;
 
         return $request;
+    }
+
+    private function setHeaders():void
+    {
+        // TODO add support for missing getallheaders
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+
+        foreach ($headers as $name => $values) {
+            // Standardize name to lowercase
+            $name = strtolower($name);
+
+            // Split values and clean up whitespace
+            $values = explode(',', $values);
+            $values = array_map('trim', $values);
+
+            // Set the header
+            $this->headers[$name] = $values;
+        }
     }
 
     private function buildUrl(bool $forwarded_host = false): string
