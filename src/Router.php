@@ -13,6 +13,7 @@ class Router
     private array $middlewares = [];
     private array $error_middlewares = [];
     private array $prefix_stack = [];
+    private bool $enable_404_middleware = false;
 
     public function get(string $path, RequestHandlerInterface|callable $handler): Route
     {
@@ -66,6 +67,11 @@ class Router
         $this->error_middlewares[] = $middleware;
     }
 
+    public function enable404middleware(bool $enable = true): void
+    {
+        $this->enable_404_middleware = $enable;
+    }
+
     public function debug(bool $enable): void
     {
         $this->debug_enabled = $enable;
@@ -102,8 +108,16 @@ class Router
         $route = $this->match($request);
 
         if ($route === null) {
-            $this->emit(new Response(404));
-            return;
+            // Just emit the 404 if no middleware
+            if (!$this->enable_404_middleware) {
+                $this->emit(new Response(404));
+                return;
+            }
+
+            // Build a 404 route for global middleware
+            $route = new Route('', '', function ($request) {
+                return (new Response(404));
+            });
         }
 
         try {
