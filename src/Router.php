@@ -117,9 +117,14 @@ class Router
             $response = $this->runner($middlewares, $route)->handle($request);
         } catch (\Throwable $e) {
             // Still log the error
-            error_log("Error: " . $e->getMessage() . "\n" .
+            error_log(
+                "Error: " . $e->getMessage() . "\n" .
                 "File: " . $e->getFile() . ":" . $e->getLine() . "\n" .
-                "Stack trace: " . $e->getTraceAsString());
+                "Stack trace: " . $e->getTraceAsString()
+            );
+
+            // Add the error to the request
+            $request = $request->withAttribute('error', $e);
 
             $debug_enabled = $this->debug_enabled;
             $route = new Route('', '', function ($request) use ($e, $debug_enabled) {
@@ -132,7 +137,7 @@ class Router
                         'trace' => $e->getTrace(),
                     ];
                 }
-                
+
                 return (new Response(500))->withJsonBody($error);
             });
 
