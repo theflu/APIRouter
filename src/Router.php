@@ -37,6 +37,7 @@ class Router
 
     public function addRoute(string $method, string $path, RequestHandlerInterface|callable $handler): Route
     {
+        // Verify method
         if (!in_array($method, self::METHODS)) {
             throw new \InvalidArgumentException("Invalid HTTP method: $method");
         }
