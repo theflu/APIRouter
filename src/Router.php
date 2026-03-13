@@ -1,7 +1,5 @@
 <?php
-
 namespace APIRouter;
-
 
 use APIRouter\Interfaces\MiddlewareInterface;
 use APIRouter\Interfaces\RequestHandlerInterface;
@@ -14,6 +12,8 @@ class Router
     private array $error_middlewares = [];
     private array $prefix_stack = [];
     private bool $enable_404_middleware = false;
+
+    public const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
     public function get(string $path, RequestHandlerInterface|callable $handler): Route
     {
@@ -35,8 +35,12 @@ class Router
         return $this->addRoute('DELETE', $path, $handler);
     }
 
-    private function addRoute(string $method, string $path, RequestHandlerInterface|callable $handler): Route
+    public function addRoute(string $method, string $path, RequestHandlerInterface|callable $handler): Route
     {
+        if (!in_array($method, self::METHODS)) {
+            throw new \InvalidArgumentException("Invalid HTTP method: $method");
+        }
+
         $prefix = implode('', $this->prefix_stack);
         $route = new Route($method, $prefix . $path, $handler);
         $this->routes[] = $route;
