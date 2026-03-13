@@ -13,7 +13,6 @@ class ServerRequest implements ServerRequestInterface
 
     private array $attributes = [];
     private string $method;
-    private string $protocol;
     private string $request_target = '/';
     private UriInterface $uri;
     private array $server_params = [];
@@ -27,7 +26,7 @@ class ServerRequest implements ServerRequestInterface
         $this->server_params = $_SERVER;
         $this->cookie_params = $_COOKIE;
         $this->uploaded_files = $_FILES;
-        $this->protocol = $version;
+        $this->version = $version;
         $this->setHeaders();
 
         if(is_null($uri)) {
