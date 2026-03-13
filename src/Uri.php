@@ -29,6 +29,7 @@ class Uri implements UriInterface
         $this->user_info .= key_exists('pass', $parts) ? ':' . $parts['pass'] : '';
         $this->host = key_exists('host', $parts) ? $parts['host'] : '';
         $this->path = key_exists('path', $parts) ? $parts['path'] : '';
+        $this->query = key_exists('query', $parts) ? $parts['query'] : '';
         $this->fragment = key_exists('fragment', $parts) ? $parts['fragment'] : '';
 
         if (key_exists('port', $parts)) {
