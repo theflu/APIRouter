@@ -127,7 +127,7 @@ class Router
 
         try {
             // Set route attributes on request
-            $request = $request->withAttribute('requires_auth', $route->isAuthRequired())
+            $request = $request->withAttribute('requires-auth', $route->isAuthRequired())
                 ->withAttribute('required-permission', $route->getRequiredPermission())
                 ->withAttribute('route-params', $route->getParams());
 
