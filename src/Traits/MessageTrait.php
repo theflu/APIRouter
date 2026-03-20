@@ -128,18 +128,25 @@ trait MessageTrait
      * Encodes $content in JSON and applies it to boday adding the json content type
      *
      * @param array|object $content
+     * @param bool $sub_nvl_utf8 Substitute invalid UTF8 when converting to JSON
      * @return static
      */
 
-    public function withJsonBody($content): MessageInterface
+    public function withJsonBody($content, bool $sub_nvl_utf8 = false): MessageInterface
     {
         if (!is_array($content) && !is_object($content)) {
             throw new InvalidArgumentException(sprintf('Expected array or object, but got %s', gettype($content)));
         }
 
-        $json = json_encode($content);
+        if ($sub_nvl_utf8) {
+            $json = json_encode($content, JSON_INVALID_UTF8_SUBSTITUTE);
+        } else {
+            $json = json_encode($content);
+        }
 
-        // TODO check for errors after json encode
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new InvalidArgumentException(sprintf('Error converting to json: %s', json_last_error_msg()));
+        }
 
         $message = clone ($this);
 
