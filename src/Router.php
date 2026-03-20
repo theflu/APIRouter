@@ -160,7 +160,7 @@ class Router
                     ];
                 }
 
-                return (new Response(500))->withJsonBody($error);
+                return (new Response(500))->withJsonBody($error, true);
             });
 
             $response = $this->runner($this->error_middlewares, $route)->handle($request);
