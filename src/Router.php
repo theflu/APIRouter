@@ -8,10 +8,12 @@ class Router
 {
     private bool $debug_enabled = false;
     private array $routes = [];
+    private array $options = [];
     private array $middlewares = [];
     private array $error_middlewares = [];
     private array $prefix_stack = [];
     private bool $enable_404_middleware = false;
+    private bool $options_enabled = true;
 
     public const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
@@ -43,8 +45,20 @@ class Router
         }
 
         $prefix = implode('', $this->prefix_stack);
-        $route = new Route($method, $prefix . $path, $handler);
+        $uri = $prefix . $path;
+        $route = new Route($method, $uri, $handler);
         $this->routes[] = $route;
+
+        // Add to options
+        if (!key_exists($uri, $this->options)) {
+            $this->options[$uri] = [];
+        }
+        
+        // Don't add the same method twice
+        if (in_array($method, $this->options[$uri])) {
+            $this->options[$uri] = $method;
+        }
+
         return $route;
     }
 
@@ -82,6 +96,11 @@ class Router
         $this->debug_enabled = $enable;
     }
 
+    public function autoOption(bool $enable): void
+    {
+        $this->options_enabled = $enable;
+    }
+
     public function loadRoutes(string $routes_path): void
     {
         if (is_dir($routes_path)) {
@@ -113,16 +132,27 @@ class Router
         $route = $this->match($request);
 
         if ($route === null) {
-            // Just emit the 404 if no middleware
-            if (!$this->enable_404_middleware) {
-                $this->emit(new Response(404));
-                return;
-            }
+            // Check for OPTIONS method
+            if ($this->options_enabled && strtoupper($request->getMethod()) == 'OPTIONS' && $methods = $this->matchOptions($request)) {
+                $route = new Route('', '', function ($request) use ($methods) {
+                    $response = new Response(204);
 
-            // Build a 404 route for global middleware
-            $route = new Route('', '', function ($request) {
-                return (new Response(404));
-            });
+                    $response->withAddedHeader('Allow', $methods);
+
+                    return $response;
+                });
+            } else {
+                // Just emit the 404 if no middleware
+                if (!$this->enable_404_middleware) {
+                    $this->emit(new Response(404));
+                    return;
+                }
+
+                // Build a 404 route for global middleware
+                $route = new Route('', '', function ($request) {
+                    return new Response(404);
+                });
+            }
         }
 
         try {
@@ -188,6 +218,25 @@ class Router
                 $params = array_filter($matches, '\is_string', ARRAY_FILTER_USE_KEY);
                 $route->setParams($params);
                 return $route;
+            }
+        }
+
+        return null;
+    }
+
+    private function matchOptions(ServerRequest $request): ?Route
+    {
+        $uri = $request->getUri()->getPath();
+        $method = $request->getMethod();
+
+        foreach ($this->options as $uri => $options) {
+
+            $quoted_path = preg_quote($uri, '#');
+            $pattern = preg_replace('/\\\\\{([a-zA-Z0-9_]+)\\\\\}/', '(?P<$1>[^/]+)', $quoted_path);
+            $pattern = "#^" . $pattern . "$#";
+
+            if (preg_match($pattern, $uri, $matches)) {
+                return $options;
             }
         }
 
