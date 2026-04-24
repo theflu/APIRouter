@@ -224,7 +224,7 @@ class Router
         return null;
     }
 
-    private function matchOptions(ServerRequest $request): ?Route
+    private function matchOptions(ServerRequest $request): array
     {
         $uri = $request->getUri()->getPath();
         $method = $request->getMethod();
@@ -240,7 +240,7 @@ class Router
             }
         }
 
-        return null;
+        return [];
     }
 
     private function runner($middlewares, $route = null)
