@@ -54,7 +54,7 @@ class Router
         if (!key_exists($uri, $this->options)) {
             $this->options[$uri] = [];
         }
-        
+
         // Don't add the same method twice
         if (!in_array($method, $this->options[$uri])) {
             $this->options[$uri][] = $method;
@@ -229,11 +229,10 @@ class Router
     private function matchOptions(ServerRequest $request): array
     {
         $uri = $request->getUri()->getPath();
-        $method = $request->getMethod();
 
-        foreach ($this->options as $uri => $options) {
+        foreach ($this->options as $opt_uri => $options) {
 
-            $quoted_path = preg_quote($uri, '#');
+            $quoted_path = preg_quote($opt_uri, '#');
             $pattern = preg_replace('/\\\\\{([a-zA-Z0-9_]+)\\\\\}/', '(?P<$1>[^/]+)', $quoted_path);
             $pattern = "#^" . $pattern . "$#";
 
