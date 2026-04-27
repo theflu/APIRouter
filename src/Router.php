@@ -57,7 +57,7 @@ class Router
         
         // Don't add the same method twice
         if (!in_array($method, $this->options[$uri])) {
-            $this->options[$uri] = $method;
+            $this->options[$uri][] = $method;
         }
 
         return $route;
