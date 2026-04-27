@@ -280,10 +280,7 @@ class Router
             assert(is_string($header));
             $name = ucwords($header, '-');
             $replace = $name !== 'Set-Cookie';
-            foreach ($values as $value) {
-                header($name . ': ' . $value, $replace, $status_code);
-                $replace = false;
-            }
+            header($name . ': ' . implode(', ', $values), $replace, $status_code);
         }
 
         header(sprintf(
