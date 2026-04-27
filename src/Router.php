@@ -138,9 +138,10 @@ class Router
                 $route = new Route('', '', function ($request) use ($methods) {
                     $response = new Response(204);
 
-                    $response->withAddedHeader('Allow', $methods);
+                    // Add OPTIONS to methods
+                    $methods[] = 'OPTIONS';
 
-                    return $response;
+                    return $response->withAddedHeader('Access-Control-Allow-Methods', $methods);
                 });
             } else {
                 // Just emit the 404 if no middleware
