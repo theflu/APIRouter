@@ -73,7 +73,7 @@ class Response implements ResponseInterface
         511 => 'Network Authentication Required',
     ];
 
-    public function __construct(int $status = 200, array $headers = [], $body = null, string $version = '1.1', ?string $reason = null)
+    public function __construct(int $status = 200, array $headers = [], ?string $body = null, string $version = '1.1', ?string $reason = null)
     {
         $this->validateStatus($status);
 
@@ -99,6 +99,9 @@ class Response implements ResponseInterface
         $this->reason = $reason;
         $this->version = $version;
 
+        if ('' !== $body && null !== $body) {
+            $this->stream = Stream::create($body);
+        }
     }
 
     public function getStatusCode(): int
