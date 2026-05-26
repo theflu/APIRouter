@@ -4,6 +4,7 @@ namespace APIRouter;
 
 use APIRouter\Traits\MessageTrait;
 use Psr\Http\Message\ResponseInterface;
+use Nyholm\Psr7\Stream;
 
 class Response implements ResponseInterface
 {
