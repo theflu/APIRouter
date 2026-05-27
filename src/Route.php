@@ -9,7 +9,7 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class Route
 {
-    private string $method;
+    private array $methods;
     private string $path;
     private mixed $handler;
     private array $params = [];
@@ -17,9 +17,9 @@ class Route
     private ?string $required_permission = null;
     private bool $requires_auth = false;
 
-    public function __construct(string $method, string $path, RequestHandlerInterface|callable $handler)
+    public function __construct(array $methods, string $path, RequestHandlerInterface|callable $handler)
     {
-        $this->method = $method;
+        $this->methods = $methods;
         $this->path = $path;
         $this->handler = $handler;
     }
@@ -33,9 +33,9 @@ class Route
         return call_user_func($this->handler, $request);
     }
 
-    public function getMethod(): string
+    public function getMethods(): array
     {
-        return $this->method;
+        return $this->methods;
     }
 
     public function getPath(): string

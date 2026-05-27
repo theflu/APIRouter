@@ -28,6 +28,11 @@ class Router
         return $this->addRoute('POST', $path, $handler);
     }
 
+    public function postGet(string $path, RequestHandlerInterface|callable $handler): Route
+    {
+        return $this->addRoute(['POST', 'GET'], $path, $handler);
+    }
+
     public function put(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('PUT', $path, $handler);
@@ -38,16 +43,23 @@ class Router
         return $this->addRoute('DELETE', $path, $handler);
     }
 
-    public function addRoute(string $method, string $path, RequestHandlerInterface|callable $handler): Route
+    public function addRoute(array|string $methods, string $path, RequestHandlerInterface|callable $handler): Route
     {
-        // Verify method
-        if (!in_array($method, self::METHODS)) {
-            throw new \InvalidArgumentException("Invalid HTTP method: $method");
+        // Mkae methods and array
+        if (is_string($methods)) {
+            $methods = [$methods];
+        }
+
+        // Verify methods
+        foreach ($methods as $method) {
+            if (!in_array($method, self::METHODS)) {
+                throw new \InvalidArgumentException("Invalid HTTP method: $method");
+            }
         }
 
         $prefix = implode('', $this->prefix_stack);
         $uri = $prefix . $path;
-        $route = new Route($method, $uri, $handler);
+        $route = new Route($methods, $uri, $handler);
         $this->routes[] = $route;
 
         // Add to options
@@ -56,8 +68,10 @@ class Router
         }
 
         // Don't add the same method twice
-        if (!in_array($method, $this->options[$uri])) {
-            $this->options[$uri][] = $method;
+        foreach ($methods as $method) {
+            if (!in_array($method, $this->options[$uri])) {
+                $this->options[$uri][] = $method;
+            }
         }
 
         return $route;
@@ -135,7 +149,7 @@ class Router
         if ($route === null) {
             // Check for OPTIONS method
             if ($this->options_enabled && strtoupper($request->getMethod()) == 'OPTIONS' && $methods = $this->matchOptions($request)) {
-                $route = new Route('', '', function ($request) use ($methods) {
+                $route = new Route([''], '', function ($request) use ($methods) {
                     $response = new Response(204);
 
                     // Add OPTIONS to methods
@@ -151,7 +165,7 @@ class Router
                 }
 
                 // Build a 404 route for global middleware
-                $route = new Route('', '', function ($request) {
+                $route = new Route([''], '', function ($request) {
                     return new Response(404);
                 });
             }
@@ -181,7 +195,7 @@ class Router
             $request = $request->withAttribute('error', $e);
 
             $debug_enabled = $this->debug_enabled;
-            $route = new Route('', '', function ($request) use ($e, $debug_enabled) {
+            $route = new Route([''], '', function ($request) use ($e, $debug_enabled) {
                 $error = ['error' => 'Internal Server Error'];
 
                 if ($debug_enabled) {
@@ -207,7 +221,7 @@ class Router
         $method = $request->getMethod();
 
         foreach ($this->routes as $route) {
-            if ($route->getMethod() !== $method) {
+            if (!in_array($method, $route->getMethods())) {
                 continue;
             }
 
