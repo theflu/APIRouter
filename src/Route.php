@@ -64,9 +64,9 @@ class Route
         return $this->middlewares;
     }
 
-    public function requireAuth(): self
+    public function requireAuth(bool $auth = true): self
     {
-        $this->requires_auth = true;
+        $this->requires_auth = $auth;
         return $this;
     }
 
