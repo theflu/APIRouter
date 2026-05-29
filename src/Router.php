@@ -13,6 +13,9 @@ class Router
     private array $middlewares = [];
     private array $error_middlewares = [];
     private array $prefix_stack = [];
+    private array $middlewares_stack = [];
+    private array $auth_stack = [];
+    private array $permission_stack = [];
     private bool $enable_404_middleware = false;
     private bool $options_enabled = true;
 
@@ -57,9 +60,29 @@ class Router
             }
         }
 
+        // Create the route
         $prefix = implode('', $this->prefix_stack);
         $uri = $prefix . $path;
         $route = new Route($methods, $uri, $handler);
+
+        // Check auth stack
+        if (end($this->auth_stack)) {
+            $route = $route->requireAuth();
+        }
+
+        // Check permission stack
+        if ($permission = end($this->permission_stack)) {
+            $route = $route->requirePermission($permission);
+        }
+
+        // Add middlewares stack
+        foreach($this->middlewares_stack as $middlewares) {
+            foreach($middlewares as $middleware) {
+                $route = $route->addMiddleware($middleware);
+            }
+        }
+
+        // Save the route
         $this->routes[] = $route;
 
         // Add to options
@@ -84,11 +107,22 @@ class Router
      * @param string $prefix The URL prefix for all routes in the group
      * @param callable $callback Receives the Router instance to define routes on
      */
-    public function group(string $prefix, callable $callback): void
+    public function group(string $prefix, callable $callback, array $middlewares = [], bool $requires_auth = false, ?string $permission = null): void
     {
+        //Build the stacks
         $this->prefix_stack[] = rtrim($prefix, '/');
+        $this->middlewares_stack[] = $middlewares;
+        $this->auth_stack[] = $requires_auth;
+        $this->permission_stack[] = $permission;
+
+        // Run it
         $callback($this);
+
+        // Prune the stacks
         array_pop($this->prefix_stack);
+        array_pop($this->middlewares_stack);
+        array_pop($this->auth_stack);
+        array_pop($this->permission_stack);
     }
 
     public function use(MiddlewareInterface $middleware): void
