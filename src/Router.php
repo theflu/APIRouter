@@ -137,7 +137,7 @@ class Router
 
         // Create the request if we didn't get one
         if (is_null($request)) {
-            $request = new ServerRequest();
+            $request = ServerRequestFactory::withGlobals();
         }
 
         // Add the start_time attribute
