@@ -18,6 +18,7 @@ class Router
     private array $permission_stack = [];
     private bool $enable_404_middleware = false;
     private bool $options_enabled = true;
+    private bool $strict_urls = false;
 
     public const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
@@ -76,8 +77,8 @@ class Router
         }
 
         // Add middlewares stack
-        foreach($this->middlewares_stack as $middlewares) {
-            foreach($middlewares as $middleware) {
+        foreach ($this->middlewares_stack as $middlewares) {
+            foreach ($middlewares as $middleware) {
                 $route = $route->addMiddleware($middleware);
             }
         }
@@ -148,6 +149,11 @@ class Router
     public function autoOption(bool $enable): void
     {
         $this->options_enabled = $enable;
+    }
+
+    public function strictUrls(bool $enable): void
+    {
+        $this->strict_urls = $enable;
     }
 
     public function loadRoutes(string $routes_path): void
@@ -254,6 +260,10 @@ class Router
         $uri = $request->getUri()->getPath();
         $method = $request->getMethod();
 
+        if (!$this->strict_urls && substr($uri, -1, 1) === '/') {
+            $uri = rtrim($uri, '/');
+        }
+
         foreach ($this->routes as $route) {
             if (!in_array($method, $route->getMethods())) {
                 continue;
@@ -261,8 +271,12 @@ class Router
 
             $quoted_path = preg_quote($route->getPath(), '#');
             $pattern = preg_replace('/\\\\\{([a-zA-Z0-9_]+)\\\\\}/', '(?P<$1>[^/]+)', $quoted_path);
-            $pattern = "#^" . $pattern . "$#";
 
+            if (!$this->strict_urls && substr($pattern, -1, 1) === '/') {
+                $pattern = rtrim($pattern, '/');
+            }
+
+            $pattern = "#^" . $pattern . "$#";
             if (preg_match($pattern, $uri, $matches)) {
                 // Filter numeric keys
                 $params = array_filter($matches, '\is_string', ARRAY_FILTER_USE_KEY);
