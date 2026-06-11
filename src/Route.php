@@ -2,6 +2,7 @@
 
 namespace APIRouter;
 
+use Exception;
 use APIRouter\Interfaces\MiddlewareInterface;
 use APIRouter\Interfaces\RequestHandlerInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -17,7 +18,7 @@ class Route
     private ?string $required_permission = null;
     private bool $requires_auth = false;
 
-    public function __construct(array $methods, string $path, RequestHandlerInterface|callable $handler)
+    public function __construct(array $methods, string $path, RequestHandlerInterface|callable|array|string $handler)
     {
         $this->methods = $methods;
         $this->path = $path;
@@ -30,7 +31,21 @@ class Route
             return $this->handler->handle($request);
         }
 
-        return call_user_func($this->handler, $request);
+        if (is_array($this->handler)) {
+            $class = $this->handler[0];
+            $method = $this->handler[1];
+            if (is_string($this->handler[0])) {
+                return (new $class())->$method($request);
+            }
+
+            return $class->$method($request);
+        }
+
+        if (is_callable($this->handler)) {
+            return call_user_func($this->handler, $request);
+        }
+
+        throw new Exception('Invalid route handler');
     }
 
     public function getMethods(): array
