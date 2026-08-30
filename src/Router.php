@@ -37,6 +37,11 @@ class Router
         return $this->addRoute(['POST', 'GET'], $path, $handler);
     }
 
+    public function patch(string $path, RequestHandlerInterface|callable $handler): Route
+    {
+        return $this->addRoute('PATCH', $path, $handler);
+    }
+
     public function put(string $path, RequestHandlerInterface|callable $handler): Route
     {
         return $this->addRoute('PUT', $path, $handler);
